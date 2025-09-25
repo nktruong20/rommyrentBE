@@ -1,17 +1,11 @@
-// controllers/scheduleController.js
 const Schedule = require("../models/Schedule");
 const Room = require("../models/Room");
 const Commission = require("../models/Commission");
 const User = require("../models/User");
 
-
-// ✅ Tạo mới lịch hẹn
 exports.createSchedule = async (req, res) => {
   try {
-    const scheduleData = {
-      ...req.body,
-      create_by: req.user._id, // gán từ token đăng nhập
-    };
+    const scheduleData = { ...req.body, create_by: req.user._id };
     const schedule = await Schedule.create(scheduleData);
     res.json(schedule);
   } catch (err) {
@@ -19,8 +13,6 @@ exports.createSchedule = async (req, res) => {
   }
 };
 
-
-// ✅ Lấy tất cả lịch (Admin)
 exports.getSchedules = async (req, res) => {
   try {
     const schedules = await Schedule.find()
@@ -33,30 +25,48 @@ exports.getSchedules = async (req, res) => {
   }
 };
 
-
 exports.updateSchedule = async (req, res) => {
   try {
     const { status, assigned_user_id, note } = req.body;
-
     let schedule = await Schedule.findById(req.params.id)
       .populate("room_id")
       .populate("assigned_user_id")
       .populate("create_by");
-
     if (!schedule) return res.status(404).json({ error: "Schedule not found" });
 
-    // Cập nhật các trường
     if (assigned_user_id) {
+      const conflicts = await Schedule.find({
+        _id: { $ne: schedule._id },
+        assigned_user_id,
+        status: { $nin: ["canceled", "done"] },
+        start_time: { $lt: schedule.end_time },
+        end_time: { $gt: schedule.start_time },
+      });
+      if (conflicts.length > 0) {
+        return res.status(400).json({
+          error: "Nhân sự đã có lịch khác trong khoảng thời gian này",
+          conflicts,
+        });
+      }
       schedule.assigned_user_id = assigned_user_id;
     }
+
     if (note !== undefined && note !== null && note.trim() !== "") {
-      schedule.note = note; // chỉ ghi đè khi có note mới
+      schedule.note = note;
     }
+
     if (status) {
+      if (status === "done") {
+        if (
+          !["admin", "boss"].includes(req.user.role) &&
+          (!schedule.assigned_user_id || !schedule.assigned_user_id.equals(req.user._id))
+        ) {
+          return res.status(403).json({ error: "Bạn không có quyền hoàn thành lịch này" });
+        }
+      }
       schedule.status = status;
     }
 
-    // Nếu hoàn thành -> tạo hoa hồng + update room
     if (status === "done" && schedule.room_id) {
       const roomPrice = schedule.room_id.price || 0;
       const snapshots = [];
@@ -67,7 +77,7 @@ exports.updateSchedule = async (req, res) => {
           snapshots.push({
             user: assignedUser._id,
             percent: 5,
-            amount: Math.round(roomPrice * 5 / 100),
+            amount: Math.round((roomPrice * 5) / 100),
             role: assignedUser.role,
           });
         }
@@ -77,13 +87,11 @@ exports.updateSchedule = async (req, res) => {
         const ctv = await User.findById(schedule.create_by);
         if (ctv) {
           const ctvPercent =
-            schedule.room_id.commission_percent ||
-            ctv.commission_percent ||
-            0;
+            schedule.room_id.commission_percent || ctv.commission_percent || 0;
           snapshots.push({
             user: ctv._id,
             percent: ctvPercent,
-            amount: Math.round(roomPrice * ctvPercent / 100),
+            amount: Math.round((roomPrice * ctvPercent) / 100),
             role: "CTV",
           });
         }
@@ -107,7 +115,6 @@ exports.updateSchedule = async (req, res) => {
     }
 
     const updated = await schedule.save();
-
     const populated = await Schedule.findById(updated._id)
       .populate("room_id")
       .populate("assigned_user_id")
@@ -115,12 +122,10 @@ exports.updateSchedule = async (req, res) => {
 
     return res.json(populated);
   } catch (err) {
-    console.error("❌ Error in updateSchedule:", err);
     return res.status(400).json({ error: err.message });
   }
 };
 
-// ✅ Xóa lịch
 exports.deleteSchedule = async (req, res) => {
   try {
     await Schedule.findByIdAndDelete(req.params.id);
@@ -130,21 +135,38 @@ exports.deleteSchedule = async (req, res) => {
   }
 };
 
-
-// ✅ Lấy lịch của user hiện tại
 exports.getMySchedules = async (req, res) => {
   try {
     const schedules = await Schedule.find({
-      $or: [
-        { create_by: req.user._id },       // lịch do mình tạo
-        { assigned_user_id: req.user._id } // lịch được phân công
-      ],
+      $or: [{ create_by: req.user._id }, { assigned_user_id: req.user._id }],
     })
       .populate("room_id")
       .populate("assigned_user_id")
       .populate("create_by");
-
     res.json(schedules);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.checkAvailability = async (req, res) => {
+  try {
+    const { staffId } = req.params;
+    const { time, duration = 90 } = req.query;
+    const start = new Date(time);
+    const end = new Date(start.getTime() + duration * 60000);
+
+    const conflicts = await Schedule.find({
+      assigned_user_id: staffId,
+      status: { $nin: ["canceled", "done"] },
+      start_time: { $lt: end },
+      end_time: { $gt: start },
+    });
+
+    if (conflicts.length > 0) {
+      return res.json({ available: false, conflicts });
+    }
+    res.json({ available: true, conflicts: [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

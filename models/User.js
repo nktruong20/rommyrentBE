@@ -7,28 +7,25 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     phone: { type: String },
     address: { type: String },
-    role: { 
-      type: String, 
-      enum: ["boss", "admin", "assistant", "CTV"], 
-      default: "CTV" 
+    role: {
+      type: String,
+      enum: ["boss", "admin", "assistant", "CTV"],
+      default: "CTV",
     },
     avatar: { type: String },
-    commission_percent: { type: Number, default: 0 }, // ✅ CTV = 0
+    commission_percent: { type: Number, default: 0 },
     updatedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
-// ✅ Middleware: set 5% cho admin & assistant khi tạo mới
 userSchema.pre("save", function (next) {
   if (this.isModified()) {
     this.updatedAt = Date.now();
   }
-
   if (this.isNew && (this.role === "admin" || this.role === "assistant")) {
     this.commission_percent = 5;
   }
-
   next();
 });
 

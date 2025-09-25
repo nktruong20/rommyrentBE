@@ -1,13 +1,14 @@
 const Room = require("../models/Room");
 
-// ================== Tạo phòng mới ==================
 exports.createRoom = async (req, res) => {
   try {
-    const me = req.user; // ✅ do authMiddleware gán
+    const me = req.user;
     if (!me?._id) return res.status(401).json({ error: "Bạn chưa đăng nhập" });
 
-    const { utilities, commonAmenities, createdBy, create_by, ...roomData } = req.body;
-
+    const { utilities, commonAmenities, ...roomData } = req.body;
+    if (!roomData.apartmentName || !roomData.price || !roomData.area || !roomData.type) {
+      return res.status(400).json({ error: "Thiếu thông tin bắt buộc" });
+    }
     if (!utilities || !commonAmenities) {
       return res.status(400).json({ error: "Thiếu utilities hoặc commonAmenities" });
     }
@@ -16,9 +17,7 @@ exports.createRoom = async (req, res) => {
       ...roomData,
       utilities,
       commonAmenities,
-      // giữ field cũ để tương thích
       create_by: me._id,
-      // snapshot mới (không tin client)
       createdBy: {
         user: me._id,
         name: me.name || "",
@@ -29,16 +28,14 @@ exports.createRoom = async (req, res) => {
     const savedRoom = await room.save();
     return res.status(201).json(savedRoom);
   } catch (err) {
-    console.error("❌ Error in createRoom:", err);
     return res.status(400).json({ error: err.message });
   }
 };
 
-// ================== Lấy tất cả phòng ==================
 exports.getRooms = async (req, res) => {
   try {
     const rooms = await Room.find()
-      .populate("create_by") // giữ nguyên để không vỡ chỗ khác
+      .populate("create_by", "name phone role")
       .populate("createdBy.user", "name phone role");
     return res.json(rooms);
   } catch (err) {
@@ -46,11 +43,10 @@ exports.getRooms = async (req, res) => {
   }
 };
 
-// ================== Lấy 1 phòng theo ID ==================
 exports.getRoomById = async (req, res) => {
   try {
     const room = await Room.findById(req.params.id)
-      .populate("create_by")
+      .populate("create_by", "name phone role")
       .populate("createdBy.user", "name phone role");
     if (!room) return res.status(404).json({ error: "Room not found" });
     return res.json(room);
@@ -59,35 +55,44 @@ exports.getRoomById = async (req, res) => {
   }
 };
 
-// ================== Cập nhật phòng ==================
 exports.updateRoom = async (req, res) => {
   try {
-    // ❌ không cho sửa lịch sử người tạo
     const { createdBy, create_by, ...roomData } = req.body;
-
-    const room = await Room.findById(req.params.id);
-    if (!room) return res.status(404).json({ error: "Room not found" });
-
-    Object.assign(room, roomData);
-
-    const updatedRoom = await room.save();
+    const updatedRoom = await Room.findByIdAndUpdate(
+      req.params.id,
+      { $set: roomData },
+      { new: true, runValidators: true }
+    );
+    if (!updatedRoom) return res.status(404).json({ error: "Room not found" });
     return res.json(updatedRoom);
   } catch (err) {
-    console.error("❌ Error in updateRoom:", err);
     return res.status(400).json({ error: err.message });
   }
 };
 
-// ================== Xoá phòng ==================
 exports.deleteRoom = async (req, res) => {
   try {
-    const room = await Room.findById(req.params.id);
+    const room = await Room.findByIdAndDelete(req.params.id);
     if (!room) return res.status(404).json({ error: "Room not found" });
-
-    await Room.findByIdAndDelete(req.params.id);
     return res.json({ message: "Room deleted successfully" });
   } catch (err) {
-    console.error("❌ Error in deleteRoom:", err);
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+exports.getRoomsFiltered = async (req, res) => {
+  try {
+    const { provinceCode, districtCode, wardCode } = req.query;
+    const query = {};
+    if (provinceCode) query["province.code"] = provinceCode;
+    if (districtCode) query["district.code"] = districtCode;
+    if (wardCode) query["ward.code"] = wardCode;
+
+    const rooms = await Room.find(query)
+      .populate("create_by", "name phone role")
+      .populate("createdBy.user", "name phone role");
+    return res.json(rooms);
+  } catch (err) {
     return res.status(400).json({ error: err.message });
   }
 };

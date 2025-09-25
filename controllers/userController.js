@@ -3,12 +3,9 @@ const Commission = require("../models/Commission");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// ================= ĐĂNG KÝ =================
-// ✅ Đăng ký mặc định (CTV)
 exports.register = async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
-
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ error: "Email đã được sử dụng" });
 
@@ -27,11 +24,9 @@ exports.register = async (req, res) => {
   }
 };
 
-// ✅ Đăng ký nhân sự (Admin tạo: role = admin | assistant)
 exports.registerManagement = async (req, res) => {
   try {
     const { name, email, password, phone, role } = req.body;
-
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ error: "Email đã được sử dụng" });
 
@@ -50,11 +45,9 @@ exports.registerManagement = async (req, res) => {
   }
 };
 
-// ================= ĐĂNG NHẬP =================
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -73,7 +66,6 @@ exports.login = async (req, res) => {
   }
 };
 
-// ================= LẤY DANH SÁCH USER =================
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.find().select("-password");
@@ -83,7 +75,6 @@ exports.getUsers = async (req, res) => {
   }
 };
 
-// ================= LẤY DANH SÁCH NHÂN SỰ =================
 exports.getStaff = async (req, res) => {
   try {
     const staff = await User.find({ role: { $in: ["admin", "assistant"] } })
@@ -94,7 +85,6 @@ exports.getStaff = async (req, res) => {
   }
 };
 
-// ================= DELETE STAFF =================
 exports.deleteStaff = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
@@ -105,12 +95,10 @@ exports.deleteStaff = async (req, res) => {
   }
 };
 
-// ================= UPDATE USER =================
 exports.updateUser = async (req, res) => {
   try {
     const id = req.params.id || req.user.id;
     const { name, email, phone, avatar, address, commission_percent } = req.body;
-
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -128,27 +116,22 @@ exports.updateUser = async (req, res) => {
   }
 };
 
-// ================= LẤY USER HIỆN TẠI =================
 exports.getMe = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-
     const user = await User.findById(req.user.id).select("-password");
     if (!user) return res.status(404).json({ error: "User not found" });
-
     res.json(user);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
 
-// ================= ĐĂNG XUẤT =================
 exports.logout = (req, res) => {
   res.clearCookie("token");
   res.json({ message: "Logout successful" });
 };
 
-// ================= DOANH THU + HOA HỒNG CỦA STAFF =================
 exports.getStaffRevenue = async (req, res) => {
   try {
     const staff = await User.aggregate([
@@ -206,10 +189,8 @@ exports.getStaffRevenue = async (req, res) => {
         },
       },
     ]);
-
     res.json(staff);
   } catch (err) {
-    console.error("❌ getStaffRevenue error:", err);
     res.status(500).json({ error: err.message });
   }
 };

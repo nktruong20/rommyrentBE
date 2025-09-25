@@ -3,7 +3,7 @@ const User = require("../models/User");
 
 module.exports = async function (req, res, next) {
   try {
-    const authHeader = req.headers.authorization; // viết gọn
+    const authHeader = req.headers.authorization; 
     if (!authHeader?.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Bạn chưa đăng nhập" });
     }
@@ -14,7 +14,7 @@ module.exports = async function (req, res, next) {
     const user = await User.findById(decoded.id).select("-password");
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    req.user = user; // gán user vào request
+    req.user = user;
     next();
   } catch (err) {
     console.error("Auth error:", err.message);

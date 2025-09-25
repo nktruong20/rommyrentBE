@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-// ✅ Snapshot người tạo (id + name + phone)
 const CreatedBySchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -12,42 +11,44 @@ const CreatedBySchema = new mongoose.Schema(
 
 const roomSchema = new mongoose.Schema(
   {
-    apartmentName: { type: String, required: true }, 
-    address: { type: String, required: true },
+    apartmentName: { type: String, required: true },
+    detailAddress: { type: String, trim: true },
+    province: { code: String, name: String },
+    district: { code: String, name: String },
+    ward: { code: String, name: String },
+    address: { type: String },
     type: {
       type: String,
-      enum: ["phòng trọ", "chung cư", "nhà ở", "chung cư mini"],
+      enum: [
+        "phòng trọ",
+        "chung cư",
+        "nhà nguyên căn",
+        "biệt thự",
+        "mặt bằng/cửa hàng",
+        "văn phòng",
+        "nhà xưởng/kho",
+      ],
       required: true,
     },
-    price: { type: Number, required: true }, 
+    price: { type: Number, required: true },
     area: { type: Number, required: true },
     description: { type: String },
-
-    // ✅ Giờ bạn nhập trực tiếp % hoa hồng khi tạo phòng
     commission_percent: { type: Number, required: true },
-
-    // ⚠️ Giữ để tương thích dữ liệu cũ
     create_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-
-    // ✅ Thông tin người tạo
     createdBy: { type: CreatedBySchema },
-
     status: {
       type: String,
       enum: ["Còn trống", "Đã thuê", "Đang bảo trì"],
       default: "Còn trống",
     },
-
     floor: { type: Number, default: 1 },
     numberOfRooms: { type: Number, default: 1 },
-
     utilities: {
       electricity: { type: Number, default: 0 },
       water: { type: Number, default: 0 },
       internet: { type: Number, default: 0 },
       service: { type: Number, default: 0 },
     },
-
     commonAmenities: {
       camera: { type: Boolean, default: false },
       smartLock: { type: Boolean, default: false },
@@ -59,7 +60,6 @@ const roomSchema = new mongoose.Schema(
       elevator: { type: Boolean, default: false },
       fireExtinguisher: { type: Boolean, default: false },
     },
-
     images: [
       {
         public_id: { type: String },
@@ -70,5 +70,15 @@ const roomSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+roomSchema.pre("save", function (next) {
+  let addressParts = [];
+  if (this.detailAddress) addressParts.push(this.detailAddress);
+  if (this.ward?.name) addressParts.push(this.ward.name);
+  if (this.district?.name) addressParts.push(this.district.name);
+  if (this.province?.name) addressParts.push(this.province.name);
+  this.address = addressParts.join(", ");
+  next();
+});
 
 module.exports = mongoose.model("Room", roomSchema);

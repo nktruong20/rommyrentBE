@@ -1,6 +1,5 @@
 const Favourite = require("../models/Favourite");
 
-// ✅ Thêm phòng vào yêu thích
 exports.addFavourite = async (req, res) => {
   try {
     if (!req.user) {
@@ -12,7 +11,6 @@ exports.addFavourite = async (req, res) => {
       return res.status(400).json({ message: "room_id is required" });
     }
 
-    // Kiểm tra nếu đã tồn tại rồi thì không tạo lại
     const existing = await Favourite.findOne({ user_id: req.user._id, room_id });
     if (existing) {
       return res.status(400).json({ message: "Phòng này đã có trong danh sách yêu thích" });
@@ -29,7 +27,6 @@ exports.addFavourite = async (req, res) => {
   }
 };
 
-// ✅ Lấy danh sách yêu thích của user hiện tại
 exports.getFavouritesByUser = async (req, res) => {
   try {
     if (!req.user) {
@@ -43,7 +40,6 @@ exports.getFavouritesByUser = async (req, res) => {
   }
 };
 
-// ✅ Xóa phòng khỏi yêu thích
 exports.removeFavourite = async (req, res) => {
   try {
     if (!req.user) {
@@ -55,7 +51,6 @@ exports.removeFavourite = async (req, res) => {
       return res.status(404).json({ message: "Favourite not found" });
     }
 
-    // Chỉ cho phép xóa nếu là chủ sở hữu
     if (fav.user_id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "Không có quyền xóa mục này" });
     }
