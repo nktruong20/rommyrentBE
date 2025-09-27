@@ -37,6 +37,7 @@ exports.getRooms = async (req, res) => {
     const rooms = await Room.find()
       .populate("create_by", "name phone role")
       .populate("createdBy.user", "name phone role");
+
     return res.json(rooms);
   } catch (err) {
     return res.status(400).json({ error: err.message });
